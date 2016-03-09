@@ -1,0 +1,1402 @@
+﻿script "displayerang"
+function tempNodeDetails @pShort,tDo
+   put "function TempNodeDetails" into xX["write"];    devLog xX
+   -- pShort = sMainShort
+   put tDo["info"] into tNodeRec
+   put tDo["doc"] into tDoc
+   -- build a cr separated string to put into a list field
+   -- in links&node, then this node's title, then out links&node
+   put pShort[tDoc][tNodeRec]["title"] into tTitle -- may or may not actually have a title
+   put "prev skim" into tInTags
+   put "next trim" into tOutTags
+   put 0 into tLineCount
+   -- in links&node
+   -- ! I don't think [master] is necessary anymore, but it might be, I dunno 18JAN2016
+   repeat for each word tTag in tInTags
+      put pShort[tDoc][tNodeRec][tTag] into tLinks
+      repeat for each line tLinkRec in tLinks
+         put tLineCount + 1 into tLineCount
+         put pShort[tDoc][tLinkRec]["weight"] into tLinkWeight
+         if tLinkWeight is empty then put "1" into tLinkWeight
+         put pShort[tDoc][tLinkRec][tTag] into tOtherNode
+         put pShort[tDoc][tOtherNode]["title"] into tOtherTitle
+         if tOtherTitle is empty then put tOtherNode into tOtherTitle
+         put pShort[tDoc][tOtherNode]["type"] into tOtherType
+         put tOtherNode into tList[tLineCount]["node"]
+         put tLinkRec into tList[tLineCount]["link"]
+         put tLinkWeight into tList[tLineCount]["weight"]
+         put "weight" into tList[tLineCount]["label"]
+         put cr & symbolLookup(tOtherType) && tOtherTitle && "[" & tTag & "]" &&  tLinkWeight && "IN>" after tList["string"]
+      end repeat
+   end repeat
+   -- divider
+   put tLineCount + 1 into tLineCount
+   put "divider" into tList[tLineCount]["label"]
+   put cr & "==========" after tList["string"]
+   -- main body of tag:data pairs for the node   
+   put "title memo figure" into tDefaults
+   repeat for each key tKey in pShort[tDoc][tNodeRec] -- ? this one might only actually catch "title"
+      if tKey is not among the words of "type next prev skim trim read bulk info" then
+         put tLineCount + 1 into tLineCount
+         put tNodeRec into tList[tLineCount]["rec"]
+         put tKey into tList[tLineCount]["label"]
+         put pShort[tDoc][tNodeRec][tKey] into tList[tLineCount][tKey]
+         if tList[tLineCount][tKey] is empty then put "[empty]" into tList[tLineCount][tKey]
+         put pShort[tDoc][tNodeRec]["type"] into tThisNodeType
+         if tKey is "title" then put tLineCount into tList["master"]
+         if tKey is "figure" and tList[tLineCount][tKey] is not "[empty]" then
+            put tList[tLineCount][tKey] into tPath
+            set itemdelimiter to slash
+            put the last item of tPath into tPath
+            put cr & "[" & tKey & "]"  && tPath after tList["string"]
+            put tLineCount into tList["displayImage"]
+         else if tKey is "title" and tList[tLineCount][tKey] is not "[empty]" then
+            put cr & "[" & tKey & "]" && symbolLookup(tThisNodeType) && tList[tLineCount][tKey] after tList["string"]
+         else
+            put cr & "[" & tKey & "]" && tList[tLineCount][tKey] after tList["string"]
+         end if
+         if tKey is among the words of tDefaults then delete word wordoffset(tKey, tDefaults) in tDefaults
+      end if
+   end repeat
+   repeat for each key tKey in pShort[tDoc][tNodeRec]["info"]
+      put tLineCount + 1 into tLineCount
+      put tNodeRec into tList[tLineCount]["rec"]
+      put tKey into tList[tLineCount]["label"]
+      put pShort[tDoc][tNodeRec]["info"][tKey] into tList[tLineCount][tKey]
+      if tList[tLineCount][tKey] is empty then put "[empty]" into tList[tLineCount][tKey]
+      put pShort[tDoc][tNodeRec]["type"] into tThisNodeType
+      put cr & "[" & tKey & "]" && symbolLookup(tThisNodeType) && tList[tLineCount][tKey] after tList["string"]
+      if tKey is among the words of tDefaults then delete word wordoffset(tKey, tDefaults) in tDefaults
+   end repeat
+   -- insert presets so that user can give them a value if they're empty
+   repeat for each word tPreset in tDefaults
+      put tLineCount + 1 into tLineCount
+      put tNodeRec into tList[tLineCount]["rec"]
+      put tPreset into tList[tLineCount]["label"]
+      put "[empty]" into tList[tLineCount][tPreset]
+      if tPreset is "title" then put tLineCount into tList["master"]
+      put pShort[tDoc][tNodeRec]["type"] into tThisNodeType
+      put cr & "[" & tPreset & "]" && symbolLookup(tThisNodeType) && tList[tLineCount][tPreset] after tList["string"]
+   end repeat
+   -- divider
+   put tLineCount + 1 into tLineCount
+   put "divider" into tList[tLineCount]["label"]
+   put cr & "==========" after tList["string"]
+   -- out links&node
+   repeat for each word tTag in tOutTags
+      put pShort[tDoc][tNodeRec][tTag] into tLinks
+      repeat for each line tLinkRec in tLinks
+         put tLineCount + 1 into tLineCount
+         put pShort[tDoc][tLinkRec]["weight"] into tLinkWeight
+         if tLinkWeight is empty then put "1" into tLinkWeight
+         put pShort[tDoc][tLinkRec][tTag] into tOtherNode
+         put pShort[tDoc][tOtherNode]["title"] into tOtherTitle
+         if tOtherTitle is empty then put tOtherNode into tOtherTitle
+         put pShort[tDoc][tOtherNode]["type"] into tOtherType
+         put tOtherNode into tList[tLineCount]["node"]
+         put tLinkRec into tList[tLineCount]["link"]
+         put tLinkWeight into tList[tLineCount]["weight"]
+         put "weight" into tList[tLineCount]["label"]
+         put cr & ">OUT" && tLinkWeight && "[" & tTag & "]" && symbolLookup(tOtherType) && tOtherTitle after tList["string"]
+      end repeat
+   end repeat
+   filter tList["string"] without empty
+   return tList
+end tempNodeDetails
+
+function stepString @pMain,pStuff
+   put "function stepString" into xX["write"];    devLog xX
+   put pStuff["rec"] into tEyeDee
+   put pStuff["doc"] into tDaDoc
+   if tDaDoc is empty or tEyeDee is empty then break
+   --takes in a step record and returns a string (type & id/title)
+   put isAnode(pMain,tDaDoc,tEyeDee) into tType
+   --   if tType is false then return "not a node"
+   if tType is false then 
+      -- it's a link
+      -- # type [x] to [z]
+      put isAlink(pMain,tDaDoc,tEyeDee) into tLinkFacts
+      put tDaDoc into tStuff["doc"]
+      put tLinkFacts["X"] into tStuff["rec"]
+      put stepString(pMain,tStuff) into tX
+      put tLinkFacts["Z"] into tStuff["rec"]
+      put stepString(pMain,tStuff) into tZ
+      put tEyeDee && tLinkFacts["type"] && "[" & tX & "]" && "to" && "[" & tZ & "]" into tTitle
+      if tTitle is empty then put "(link)" && tEyeDee into tTitle
+      return tTitle
+   else
+      -- it's a node
+      put tEyeDee into tStuff["rec"]
+      put "title" into tStuff["tag"]
+      put tDaDoc into tStuff["doc"]
+      put getTagData(pMain,tStuff) into tTitle
+      if tTitle is empty then put tEyeDee && "blank" into tTitle
+      put symbolLookup(tType) && tTitle into tThisString
+      return tThisString
+   end if
+end stepString
+
+function symbolLookup tArg --a lookup table for display symbols
+   put "function symbolLookup" into xX["write"];    devLog xX
+   switch tArg
+      case "state"
+         return numtocodepoint(0x25A0) --box
+      case "change"
+         return numtocodepoint(0x25B2) --triangle
+   end switch
+   return "not found in symbolLookup function"
+end symbolLookup
+
+function symbolLookupHTML tArg --a lookup table for display symbols
+   put "function symbolLookup" into xX["write"];    devLog xX
+   switch tArg
+      case "state"
+         return "&#9632;"--box
+      case "change"
+         return "&#9650;" --triangle
+   end switch
+   return "not found in symbolLookup function"
+end symbolLookupHTML
+
+on tempConvertData pShort,@pData,pDoc
+   put "on tempConvertData" into xX["write"];    devLog xX
+   -- sMainShort to sGraphData
+   -- sMainShort[doc][rec][next/prev]
+   -- sGraphData[nodes/links][rec][next/prev/displayString]
+   
+   repeat for each key tRec in pShort[pDoc]
+      if pShort[pDoc][tRec]["type"] is among the words of "state change" then
+         -- node...probably !
+         put pShort[pDoc][tRec] into pData["nodes"][tRec]
+      else if tRec is not 0 then
+         -- link...probably !
+         put pShort[pDoc][tRec] into pData["links"][tRec]
+      end if
+   end repeat
+   -- node neighbors
+   -- this is important for preview and change logic
+   -- link,node
+   repeat for each key tRec in pData["nodes"]
+      repeat for each word tDir in "next prev trim skim"
+         --         repeat for each item tLink in pData["nodes"][tRec][tDir]
+         repeat for each line tLink in pData["nodes"][tRec][tDir]
+            if tDir is "next" or tDir is "prev" then
+               put cr & tLink & "," & pData["links"][tLink][tDir] after pData["abutFlow"][tRec]
+               filter pData["abutFlow"][tRec] without empty
+            else if tDir is "trim" then
+               put cr & tLink & "," & pData["links"][tLink][tDir] after pData["abutRise"][tRec]
+               filter pData["abutRise"][tRec] without empty
+            else if tDir is "skim" then
+               put cr & tLink & "," & pData["links"][tLink][tDir] after pData["abutDive"][tRec]
+               filter pData["abutDive"][tRec] without empty
+            end if
+         end repeat
+      end repeat
+   end repeat
+   -- find the case node
+   -- needed to request certain changes
+   repeat for each key tRec in pData["nodes"]
+      if "bulk" is among the keys of pData["nodes"][tRec] and "read" is among the keys of pData["nodes"][tRec] then
+         put tRec into pData["case"]
+      end if
+   end repeat
+   -- undo/redo
+   put pShort[pDoc][0]["undo"] into pData["undo"]
+   put pShort[pDoc][0]["redo"] into pData["redo"]
+   -- metatdata
+   put pShort[pDoc][0]["pointerTags"] into pData["pointerTags"]
+   -- node display label ----------------
+   repeat for each key tRec in pData["nodes"]
+      put pShort[pDoc][tRec]["title"] into tForShow
+      if tForShow is empty then
+         --         put symbolLookup(pShort[pDoc][tRec]["type"]) && tRec into tForShow
+         put "<p>" & symbolLookupHTML(pShort[pDoc][tRec]["type"]) && tRec & "</p>" into tForShow
+      else
+         --         put symbolLookup(pShort[pDoc][tRec]["type"]) & " " before tForShow
+         put symbolLookupHTML(pShort[pDoc][tRec]["type"]) into tSymbol
+         put "<p>" & tSymbol & space before tForShow
+         put "</p>" after tForShow
+      end if
+      put tForShow into pData["nodes"][tRec]["displayString"]
+      put tForShow into pData["nodes"][tRec]["displayStringExtended"]
+      -- pass forward the memo & figure if they're present
+      put pShort[pDoc][tRec]["memo"] into tForShow
+      if tForShow is not empty then put cr & "<p>" & tForShow & "</p>" after pData["nodes"][tRec]["displayStringExtended"]
+      put pShort[pDoc][tRec]["figure"] into tForShow
+      -- set all of the <img> tags to the same image object
+      -- later, if this figure needs to be shown in a field (like tooltip), that image object's filename will be set to the figure's path
+      -- the field's image won't care what's in the image object
+      -- 17624 is the ID of image "figureSource"
+      if tForShow is not empty then 
+         put cr & "<p><img src=17624></p>" after pData["nodes"][tRec]["displayStringExtended"]
+         
+      end if
+   end repeat
+end tempConvertData
+
+on middleOut pData,@pDraw,@pFocus -- ! a hacky way to draw the provided graph, calls assignLayers
+   -- ! as of 10JAN2016 middleOut only follows flow links, so it won't visit or follow dive/rise links
+   put "on middleOut" into xX["write"];    devLog xX
+   -- pData ! just sGraphData at the moment, maybe this should be an adjacency list ?
+   -- setup variables --------------------------------------------------------------------------------
+   put empty into pData["layers"]
+   put empty into pData["visited"]
+   -- make sure the focus node is actually focusable
+   put the keys of pData["nodes"] into tKeys
+   put empty into tRecs
+   repeat for each line tLine in tKeys
+      if tLine is a number then put tLine into line (the number of lines of tRecs)+1 of tRecs
+   end repeat
+   if pFocus is not among the lines of tRecs then
+      sort tRecs numeric descending
+      put line 1 of tRecs into pFocus
+   end if
+   -- recursively assign layers ------------------------------------------------------------------------
+   -- pass pData by reference, and focus node, and initial layer
+   -- add layer and visited info to pData
+   assignLayers pData,pFocus,0
+   -- remove duplicates in layers ------------------------------------------------------------------
+   repeat for each key tLayer in pData["layers"]
+      put pData["layers"][tLayer]into tOneLayer
+      split tOneLayer by comma
+      combine tOneLayer using comma
+      if char -1 of tOneLayer is not "," then put "," after tOneLayer
+      put tOneLayer into pData["layers"][tLayer]
+   end repeat
+   -- shuffle nodes so links point left-to-right ----------------------------------------------------
+   -- when a pair of linked nodes are misaligned...
+   --- if on the pos side (layers >0), shift end more pos
+   --- if on the neg side (layers <0), shift start more neg
+   --- making a link vertical is okay, but not backwards
+   --- don't move the focused node out of layer 0
+   put empty into tShuffles -- cr delimited list; node and direction shuffled; kill infinite loop
+   put true into tAgain -- keep repeating until nothing changes
+   repeat while tAgain is true
+      put false into tAgain
+      repeat for each item tLink in pData["visited"]["links"]
+         put item 1 of pData["links"][tLink]["prev"] into tStart
+         put item 1 of pData["links"][tLink]["next"] into tEnd
+         put pData["nodes"][tStart]["layer"] into tStartLayer
+         put pData["nodes"][tEnd]["layer"] into tEndLayer
+         if not (tStartLayer < tEndLayer) then
+            if tEnd is pFocus then
+               -- shuffle start more negative
+               put true into tAgain
+               --               delete item itemOffset(tStart,pData["layers"][tStartLayer]) of pData["layers"][tStartLayer]
+               set the wholeMatches to true
+               put itemOffset(tStart,pData["layers"][tStartLayer]) into tNum
+               delete item tNum of pData["layers"][tStartLayer]
+               put tStart & "," after pData["layers"][tStartLayer -1]
+               put tStartLayer -1 into pData["nodes"][tStart]["layer"]
+               put cr & tStart & "-" after tShuffles
+               filter tShuffles without empty
+            else if tEnd & "-" is among the lines of tShuffles then
+               -- have to catch a situation where a node just shuffles back and forth
+               -- shuffle start more negative
+               put true into tAgain
+               delete item itemOffset(tStart,pData["layers"][tStartLayer]) of pData["layers"][tStartLayer]
+               put tStart & "," after pData["layers"][tStartLayer -1]
+               put tStartLayer -1 into pData["nodes"][tStart]["layer"]
+               put cr & tStart & "-" after tShuffles
+               filter tShuffles without empty
+            else
+               -- shuffle end more positive
+               put true into tAgain
+               delete item itemOffset(tEnd,pData["layers"][tEndLayer]) of pData["layers"][tEndLayer]
+               put tEnd & "," after pData["layers"][tEndLayer +1]
+               put tEndLayer +1 into pData["nodes"][tEnd]["layer"]
+               put cr & tEnd & "+" after tShuffles
+               filter tShuffles without empty
+            end if
+         end if -- is tStart < tEnd?
+      end repeat -- tLink in sLinksVisited
+   end repeat -- tAgain
+   -- order in layer by node #, ascending ----------------------------------------------------------
+   repeat for each key tLayer in pData["layers"]
+      sort items of pData["layers"][tLayer] ascending numeric
+      if char 1 of pData["layers"][tLayer] is "," then delete char 1 of pData["layers"][tLayer]
+   end repeat
+   -- ! deal with elements that are visible but weren't discovered by middleOut
+   repeat for each word tKind in "nodes links"
+      repeat for each line tRec in the keys of pData[tKind]
+         if tRec is not among the items of pData["visited"][tKind] then
+            put tRec into item (the number of items of pData["unvisited"][tKind])+1 of pData["unvisited"][tKind]
+         end if
+      end repeat
+   end repeat
+   put pData into pDraw
+end middleOut
+
+on assignLayers @pAll,pSeed,pTheLayer -- ! the recursive part of middleOut
+   put "on assignLayers" into xX["write"];    devLog xX
+   -- pAll = pData (just a copy of sGraphData at the moment); this adds display info to it
+   -- pSeed = the node to find neighbors of
+   -- pTheLayer = the layer pSeed was assigned before this function was called
+   --- list all next & prev links
+   --- format as links
+   --- don't add if already on list of visited links
+   --- add node to layer; prev -1; next +1
+   --- call this function again on this node
+   --- terminal case is when this node has no unvisited links
+   if pSeed is not among the items of pAll["visited"]["nodes"] then
+      put pSeed & "," after pAll["visited"]["nodes"]
+      put pSeed & "," after pAll["layers"][pTheLayer]
+      put pTheLayer into pAll["nodes"][pSeed]["layer"]
+      repeat for each word tDir in "next prev"
+         --         repeat for each item tLink in pAll["nodes"][pSeed][tDir]
+         repeat for each line tLink in pAll["nodes"][pSeed][tDir]
+            if tLink is not among the items of pAll["visited"]["links"] then
+               put tLink & "," after pAll["visited"]["links"]
+               filter pAll["visited"]["links"] without empty
+               put item 1 of pAll["links"][tLink][tDir] into tNode
+               switch tDir
+                  case "next"
+                     assignLayers pAll,tNode,(pTheLayer +1)
+                     break
+                  case "prev"
+                     assignLayers pAll,tNode,(pTheLayer - 1)
+                     break
+               end switch
+            end if
+         end repeat
+      end repeat 
+   end if
+end assignLayers
+
+on displayManager pInfo,@pGUI,pSizes,pNow,@pHist -- ! creates/changes/deletes controls
+   put "on displayManager" into xX["write"];    devLog xX
+   -- sGraphDrawing,sGUIstuff,tSizes,sNowFocus,sMouseHistory
+   --pSizes[width/height/layer/node]
+   lock messages
+   -- delete old node graphics; brute force but not much to draw at the moment   
+   if pGUI is not empty then
+      repeat for each word tKind in "nodes links"
+         repeat for each key tNum in pGUI[tKind]
+            put pGUI[tKind][tNum]["graphic"] into tID
+            if exists(tID) then delete tID
+         end repeat
+      end repeat
+   end if
+   put pSizes["width"] into tWinWidth
+   put pSizes["height"] into tWinHeight
+   put tWinWidth/2 into tCenterH
+   lock screen
+   put empty into pGUI
+   -- specify case node
+   put pInfo["case"] into pGUI["case"]
+   put pInfo["abutFlow"] into pGUI["abutFlow"]
+   put pInfo["abutDive"] into pGUI["abutDive"]
+   put pInfo["abutRise"] into pGUI["abutRise"]
+   -- calculate node coordinates and draw graphic
+   repeat for each key tLayer in pInfo["layers"]
+      put ((pSizes["node"] + pSizes["layer"]) * tLayer) + tCenterH into tNodeH
+      put the number of items of pInfo["layers"][tLayer] into tStack
+      put tWinHeight/(tStack + 1) into tStackV
+      put 1 into tCount
+      repeat for each item tNode in pInfo["layers"][tLayer]
+         -- start positioning from top of window
+         put tStackV * tCount into tNodeV
+         -- node coordinates
+         put tNodeH into pGUI["nodes"][tNode]["horz"]
+         put tNodeV into pGUI["nodes"][tNode]["vert"]
+         put tNode into tStuff["node"]
+         put tNodeH & "," & tNodeV into tStuff["coord"]
+         put pSizes["node"] into tStuff["size"]
+         put pInfo["nodes"][tNode]["type"] into tStuff["type"]
+         -- node type
+         put tStuff["type"] into pGUI["nodes"][tNode]["type"]
+         -- node's display string & figure
+         put pInfo["nodes"][tNode]["displayString"] into pGUI["nodes"][tNode]["displayString"]
+         put pInfo["nodes"][tNode]["displayString"] into tStuff["displayString"]
+         put pInfo["nodes"][tNode]["displayStringExtended"] into pGUI["nodes"][tNode]["displayStringExtended"]
+         put pInfo["nodes"][tNode]["displayStringExtended"] into tStuff["displayStringExtended"]
+         put pInfo["nodes"][tNode]["figure"] into pGUI["nodes"][tNode]["figure"]
+         -- node's graphic ID
+         put makeNode(tStuff) into pGUI["nodes"][tNode]["graphic"]
+         -- node's neighbors
+         put pInfo["abutFlow"][tNode] into pGUI["nodes"][tNode]["abutFlow"]
+         if tNode is among the keys of pInfo["abutDive"] then put pInfo["abutDive"][tNode] into pGUI["nodes"][tNode]["abutDive"]
+         if tNode is among the keys of pInfo["abutRise"] then put pInfo["abutRise"][tNode] into pGUI["nodes"][tNode]["abutRise"]
+         put tCount + 1 into tCount
+      end repeat
+   end repeat
+   -- put miscellaneous nodes into the pool, or whatever ---------------------
+   -- not the case node cuz technically the whole window is the case node
+   put false into tMisc
+   put 0 into tCountThis
+   repeat for each item tNode in pInfo["unvisited"]["nodes"]
+      if tNode is not among the items of pInfo["case"] then
+         put true into tMisc
+         -- node coordinates
+         put (pSizes["node"]/2) + (tCountThis * (pSizes["node"] + pSizes["layer"])) into pGUI["nodes"][tNode]["horz"]
+         put tWinHeight-(pSizes["node"]/2) into pGUI["nodes"][tNode]["vert"]
+         -- build request
+         put tNode into tStuff["node"]
+         put pGUI["nodes"][tNode]["horz"] & "," & pGUI["nodes"][tNode]["vert"] into tStuff["coord"]
+         put pSizes["node"] into tStuff["size"]
+         put pInfo["nodes"][tNode]["type"] into tStuff["type"]
+         -- node type
+         put tStuff["type"] into pGUI["nodes"][tNode]["type"]
+         -- node's display string
+         put pInfo["nodes"][tNode]["displayString"] into pGUI["nodes"][tNode]["displayString"]
+         put pInfo["nodes"][tNode]["displayString"] into tStuff["displayString"]
+         put pInfo["nodes"][tNode]["displayStringExtended"] into pGUI["nodes"][tNode]["displayStringExtended"]
+         put pInfo["nodes"][tNode]["displayStringExtended"] into tStuff["displayStringExtended"]
+         put pInfo["nodes"][tNode]["figure"] into pGUI["nodes"][tNode]["figure"]
+         -- node's graphic ID
+         put makeNode(tStuff) into pGUI["nodes"][tNode]["graphic"]      
+         put true into pGUI["nodes"][tNode]["misc"]
+         put tCountThis + 1 into tCountThis
+      end if
+   end repeat
+   -- draw flow links...crudly --------------------------
+   repeat for each key tLink in pInfo["links"]
+      if tLink is 0 then next repeat -- ! probably don't need this as of 11JAN2016
+      -- if this link is attached to a misc node, don't draw it
+      put false into tMoveOn
+      repeat for each key tSomething in pInfo["links"][tLink]
+         if tSomething is among the words of "next prev read skim bulk trim" then
+            put pInfo["links"][tLink][tSomething] into tTag
+            if pGUI["nodes"][tTag]["misc"] is true then 
+               put true into tMoveOn
+               exit repeat -- exit this small repeat test
+            end if
+         end if
+      end repeat
+      if tMoveOn is true then next repeat -- next tLink
+      -- okay, so go ahead and draw the link tLink
+      if pInfo["links"][tLInk]["type"] is not "dive" and pInfo["links"][tLInk]["type"] is not "rise" then -- FLOW
+         put item 1 of pInfo["links"][tLink]["prev"] into tStart
+         put item 1 of pInfo["links"][tLink]["next"] into tEnd
+         put pSizes["node"] / 2 into tClean
+         put (pGUI["nodes"][tStart]["horz"]+tClean) & "," & pGUI["nodes"][tStart]["vert"] into tStartCoord
+         put (pGUI["nodes"][tEnd]["horz"]-tClean) & "," & pGUI["nodes"][tEnd]["vert"] into tEndCoord
+         put tLink into tBox["link"]
+         put tStartCoord & cr & tEndCoord into tBox["line"]
+         put pSizes["link"] into tBox["size"]
+         put pInfo["links"][tLink]["type"] into tBox["type"]
+         put pInfo["links"][tLink]["weight"] into tWeight
+         if tWeight is empty then
+            put 1 into pGUI["links"][tLink]["weight"]
+         else
+            put tWeight into pGUI["links"][tLink]["weight"]
+         end if
+         put tBox["type"] into pGUI["links"][tLink]["type"]
+         put makeLink(tBox) into pGUI["links"][tLink]["graphic"]
+      else if pInfo["links"][tLInk]["type"] is "dive" then -- DIVE 
+         -- what node diving into
+         --- pInfo link>read=#
+         --- pGUI node>#>graphic
+         -- rect of that control
+         -- points = L-10,top cr L,T+10
+         put pInfo["links"][tLink]["read"] into tTheNode
+         put pGUI["nodes"][tTheNode]["graphic"] into tTheNodeName
+         put the rect of tTheNodeName into tTheNodeRect
+         put item 1 of tTheNodeRect into tL
+         put item 2 of tTheNodeRect into tT
+         put (tL-10) & "," & tT & cr & tL & "," & (tT+10) into tStuff["line"]
+         put tLink into tStuff["link"]
+         put 2 into tStuff["size"]
+         put makeScopeLink(tStuff) into pGUI["links"][tLink]["graphic"]
+      else if pInfo["links"][tLInk]["type"] is "rise" then -- RISE
+         -- what node rising out of
+         --- pInfo link>trim=#
+         --- pGUI node>#>graphic
+         -- rect of that control 
+         -- points = right,T+10 cr R+10,top
+         put pInfo["links"][tLink]["bulk"] into tTheNode
+         put pGUI["nodes"][tTheNode]["graphic"] into tTheNodeName
+         put the rect of tTheNodeName into tTheNodeRect
+         put item 3 of tTheNodeRect into tR
+         put item 2 of tTheNodeRect into tT
+         put tR  & "," & (tT+10) & cr & (tR+10) & "," & tT into tStuff["line"]
+         put tLink into tStuff["link"]
+         put 2 into tStuff["size"]
+         put makeScopeLink(tStuff) into pGUI["links"][tLink]["graphic"]
+      end if
+   end repeat
+   -- draw scope links...also crudly -------------------
+   
+   -- make sure the node graphics are on top
+   repeat for each key tNode in pGUI["nodes"]
+      set the layer of pGUI["nodes"][tNode]["graphic"] to top
+   end repeat
+   -- then make sure the preview graphics are on top of that
+   set the layer of graphic "preFlow1" stack "HowstrBeta" to top
+   set the layer of graphic "preFlow2" stack "HowstrBeta" to top
+   set the layer of field "preState" stack "HowstrBeta" to top
+   set the layer of field "preChange" stack "HowstrBeta" to top
+   -- highlight focused node (since all nodes new, old highlighted one was deleted)
+   put pGUI["nodes"][pNow]["graphic"] into tBlerg
+   set the backgroundColor of tBlerg to "0,100,100"
+   -- undo/redo icons
+   -- for quick mode, don't allow user to undo the graph smaller than the minimum action group
+   -- ! 15DEC2015 hide can take graph down to 4 nodes with undo still being acceptable
+   -- what I really want to prevent is undoing back through the initialization steps
+   --   if the number of lines of the keys of pInfo["nodes"] is 4 then
+   --      set the visible of widget "iconUndo" to false
+   --   else
+   --      set the visible of widget "iconUndo" to pInfo["undo"]
+   --   end if
+   set the visible of widget "iconUndo" stack "howstrBeta" to pInfo["undo"]
+   set the visible of widget "iconRedo" stack "howstrBeta" to pInfo["redo"]
+   -- empty out selection and hide hide button
+   put empty into pHist["nodeSelected"]
+   put empty into pHist["linkSelected"]
+   set the visible of button "hideButt" stack "howstrBeta" to false
+   -- set misc nodes navigation buttons
+   set the visible of button "miscRightButt" stack "howstrBeta" to tMisc
+   set the visible of button "miscLeftButt" stack "howstrBeta" to tMisc
+   unlock screen
+   unlock messages
+   put "end displayManager --------------" into xX["write"];    devLog xX
+end displayManager
+
+function makeNode pDetails
+   put "function makeNode" into xX["write"];    devLog xX
+   --   breakpoint
+   -- pDetails[node/coord/size/type/displayString/displayStringExtended]
+   -- ! assume doc is 1
+   put 1 into tDoc
+   set the margins of the templateField to 3
+   set the locked of the templateField to true
+   set the lockText of the templateField to true
+   set the dontwrap of the templateField to false
+   set the height of the templateField to pDetails["size"]
+   set the width of the templateField to pDetails["size"]
+   set the name of the templateField to pDetails["node"] & "NodeGraphic"
+   set the location of the templateField to pDetails["coord"]
+   set the threeD of the templatefield to false
+   set the showborder of the templatefield to false
+   set the bordercolor of the templatefield to white
+   set the backgroundcolor of the templatefield to "0,220,220"
+   set the textSize of the templatefield to 14
+   set the outerglow["color"] of the templatefield to "40,40,40"
+   --   set the behavior of the templatefield to the long id of button "graphBehave"
+   set the defaultstack to "HowstrBeta"
+   put the defaultstack into tTemp
+   --   put the defaultstack into field "filenameLabel" stack "HowstrBeta" -- ! just for troubleshooting !!!
+   --   create field (the long ID of stack "HowstrBeta")
+   create field
+   put it into tID
+   set the cGraphKey of (tID) to pDetails["node"]
+   set the htmltext of (tID) to pDetails["displayString"]   
+   -- size the node to fit the displayString, within limits
+   put the formattedHeight of word 1 to -1 of (tID) into tFormHigh
+   put the height of (tID) into tHigh
+   put 1 into tCounter
+   repeat while tFormHigh > tHigh
+      switch tCounter
+         case 1
+            set the width of (tID) to pDetails["size"] * 1.25
+            break
+         case 2
+            set the height of (tID) to pDetails["size"] * 1.5
+            break
+         case 3
+            set the textsize of (tID) to 12
+            break
+         case 4
+            set the textsize of (tID) to 10
+            break
+         default
+            exit repeat -- just finish
+      end switch
+      put tCounter + 1 into tCounter
+      put the formattedHeight of word 1 to -1 of (tID) into tFormHigh
+      put the height of (tID) into tHigh
+   end repeat
+   --   if the height of (tID) > pDetails["size"] then set the height of (tID) to the formattedHeight of word 1 to -1 of (tID)
+   return tID
+end makeNode
+
+function makeLink pThis
+   put "function makeLink" into xX["write"];    devLog xX
+   -- pThis[link/line/type]
+   set the style of the templateGraphic to "line"
+   set the endArrow of the templateGraphic to true
+   set the foregroundColor of the templategraphic to "0,220,220"
+   set the points of the templateGraphic to pThis["line"]
+   set the name of the templateGraphic to pThis["link"] & "LinkGraphic"
+   set the filled of the templateGraphic to false
+   set the linesize of the templateGraphic to pThis["size"]
+   set the outerglow["color"] of the templateGraphic to "40,40,40"
+   --   set the behavior of the templateGraphic to the long id of button "graphBehave"
+   --   create graphic (the long ID of stack "howstrBeta")
+   set the defaultstack to "HowstrBeta"
+   create graphic
+   set the cGraphKey of it to pThis["link"]
+   return it
+end makeLink
+
+function makeScopeLink pThis
+   set the style of the templateGraphic to "line"
+   set the endArrow of the templateGraphic to true
+   set the foregroundColor of the templategraphic to "0,220,220"
+   set the points of the templateGraphic to pThis["line"]
+   set the name of the templateGraphic to pThis["link"] & "LinkGraphic"
+   set the filled of the templateGraphic to false
+   set the linesize of the templateGraphic to pThis["size"]
+   set the outerglow["color"] of the templateGraphic to "40,40,40"
+   --   set the behavior of the templateGraphic to the long id of button "graphBehave"
+   --   create graphic (the long ID of stack "howstrBeta")
+   set the defaultstack to "HowstrBeta"
+   create graphic
+   set the cGraphKey of it to pThis["link"]
+   return it
+end makeScopeLink
+
+function mouseTracker @pGUI,@pHist,@p1Down,@p1Enter,pFocus,pNode,pPath
+   --   put "function mouseTracker" into xX["write"];    devLog xX
+   -- sGUIstuff,sMouseHistory,s1Down,s1Enter,sNowFocus,sNodeSize
+   -- this mostly replaces Livecode's built in mouse handlers because they couldn't reliably do what I wanted
+   -- this gets called for almost all mouse messages and compares current status to prior status
+   -- (1) research the state of the mouse
+   -- (1a) record the location of the mouse and selections
+   -- (1b) compare old mouse button states to new
+   -- (1c) if an anchor, track new areas entered
+   -- (2) build preview based on research
+   -- tNow[1down]=true/false
+   -- tNow[3down]=true/false
+   -- tNow[inside]=empty/#
+   -- tNow[moving]=X,Y
+   -- tNow[fixed]=X,Y/empty
+   -- tNow[nodeSelected]=#,#,# (cuz they're organized first by node/link in GUIstuff)
+   -- tNow[linkSelected]=#,#,#
+   -- tNow[tooltip]=true/false
+   
+   -- (1) state of controls
+   put the hilite of button "tooltipSwitch" stack "HowstrBeta" into tNow["tooltip"]
+   put "false" into tNow["1down"]
+   -- ! Jeremy's using Ubuntu 15.04 and the mouse() function returns a different number for button down
+   if the hilite of button "jeremyBugButt" stack "HowstrBeta" is true then 
+      put 0 into mouseLeft
+      put 2 into mouseRight
+   else
+      put 1 into mouseLeft
+      put 3 into mouseRight
+   end if
+   if mouse(mouseLeft) is "down" then put "true" into tNow["1down"] -- for preview logic
+   put "false" into tNow["3down"]
+   if mouse(mouseRight) is "down" then put "true" into tNow["3down"] -- for selection logic
+   -- (1a) location of mouse & selection indicators (since we're here)
+   put empty into tNow["inside"]
+   if pHist["3down"] is false and tNow["3down"] is true then -- reset selection when button down, otherwise retain
+      put empty into tNow["nodeSelected"]
+      put empty into tNow["linkSelected"]
+      set the visible of button "hideButt" stack "HowstrBeta" to false
+   else
+      put pHist["nodeSelected"] into tNow["nodeSelected"]
+      put pHist["linkSelected"] into tNow["linkSelected"]
+   end if
+   repeat for each word tType in "nodes links"
+      repeat for each key tNum in pGUI[tType]
+         -- find out if the mouse is inside of a graph element
+         -- within() doesn't depend on the rect, so how it treats negative space is more intuitive
+         if within(pGUI[tType][tNum]["graphic"],the mouseloc) then
+            put tNum into tNow["inside"]
+         end if
+         -- clear hilite; will be reapplied later if element still selected
+         if tType is "nodes" and tNum is not among the items of pHist["nodeSelected"] then set the showborder of pGUI[tType][tNum]["graphic"] to false
+         if tType is "links" and tNum is not among the items of pHist["linkSelected"] then  set the foregroundColor of pGUI[tType][tNum]["graphic"] to "0,220,220"
+         -- selection box
+         if tNow["3down"] and intersect(pGUI[tType][tNum]["graphic"],graphic "selectBox" stack "HowstrBeta","pixels") then
+            -- add any new selection to lists
+            if tType is "nodes" and tNum is not among the items of tNow["nodeSelected"] and tNum is not pFocus then 
+               put tNum into item (the number of items of tNow["nodeSelected"])+1 of tNow["nodeSelected"]
+               set the visible of button "hideButt" stack "HowstrBeta" to true
+            end if
+            if tType is "links" and tNum is not among the items of tNow["linkSelected"] then 
+               put tNum into item (the number of items of tNow["linkSelected"])+1 of tNow["linkSelected"]
+               set the visible of button "hideButt" stack "HowstrBeta" to true
+            end if
+         end if-- if 3down is true & intersection
+      end repeat
+   end repeat
+   -- auto-select any links attached to a selected node
+   repeat for each item tNode in tNow["nodeSelected"]
+      --      put listOfLinks(tNode) into tLinks -- ! this is a pain with the current organization, but it's short and easy to replicate
+      -- pGUI[nodes][#][abutFlow/Dive/Rise]=#,# cr #,# (link rec),(node rec)
+      repeat for each word tKind in "abutFlow abutDive abutRise"
+         repeat for each line tConnection in pGUI["nodes"][tNode][tKind]
+            put item 1 of tConnection into tCon
+            if tCon is not among the items of tNow["linkSelected"] then
+               put tCon into item (the number of items of tNow["linkSelected"])+1 of tNow["linkSelected"]
+            end if
+         end repeat
+      end repeat
+   end repeat
+   -- hilite selected elements
+   repeat for each item tNum in tNow["nodeSelected"]
+      set the showborder of pGUI["nodes"][tNum]["graphic"] to true
+   end repeat
+   repeat for each item tNum in tNow["linkSelected"]
+      set the foregroundColor of pGUI["links"][tNum]["graphic"] to white
+   end repeat
+   --   put tNow["nodeSelected"] & cr & tNow["linkSelected"] into field "showMe" stack "HowstrBeta" -- ! for development
+   -- selection box calculation
+   put the mouseLoc into tNow["moving"]
+   put pHist["fixed"] into tNow["fixed"]
+   
+   
+   -- (1b) compare old to new
+   if pHist["1down"] is false and tNow["1down"] is true then
+      -- button 1 just transitioned from up to down 
+      put tNow["inside"] into p1Down -- becomes "anchor"
+   end if
+   if pHist["3down"] is false and tNow["3down"] is true then
+      -- button 3 just transitioned from up to down
+      put the mouseLoc into tNow["fixed"] -- becomes fixed point for selectBox
+      set the layer of graphic "selectBox" stack "HowstrBeta" to top
+      set the visible of graphic "selectBox" stack "HowstrBeta" to true
+   end if
+   if pHist["3down"] is true and tNow["3down"] is false then
+      -- button 3 just transitioned from down to up
+      put empty into tNow["fixed"] -- no more selectBox
+      set the visible of graphic "selectBox" stack "HowstrBeta" to false
+   end if
+   put pHist["fixed"] into tStuff["point1"]
+   put tNow["moving"] into tStuff["point2"]
+   -- ! there was an error where fixed would be empty the first time or something like that
+   if tStuff["point1"] is not empty then set the rect of graphic "selectBox" stack "HowstrBeta" to twoPointBox(tStuff)
+   if tNow["3down"] is not true then set the rect of graphic "selectBox" stack "HowstrBeta" to "0,0,0,0" -- otherwise it's still there messing with stuff like a ghost
+   ---------------------------- tooltip --------------------------------------
+   if tNow["tooltip"] is true and tNow["inside"] is a number and tNow["1down"] is false and tNow["3down"] is false then
+      lock screen      
+      -- size the tooltip field
+      if pHist["tooltipRect"] is not empty and (tNow["inside"] is pHist["inside"]) then
+         put pHist["tooltipRect"] into tNow["tooltipRect"]
+      else
+         if tNow["inside"] is among the keys of pGUI["nodes"] then
+            put pGUI["nodes"][tNow["inside"]]["figure"] into tReq["targetMedia"]
+            put pPath into tReq["projectFile"]
+            set the filename of image "figureSource" stack "howstrBeta" to correctAbsoluteMediaPath(tReq)
+            set the rect of image "figureSource" stack "howstrBeta" to 0,0,50,50
+            set the htmlText of field "tooltipField" stack "HowstrBeta" to pGUI["nodes"][tNow["inside"]]["displayStringExtended"]       
+         else if tNow["inside"] is among the keys of pGUI["links"] then
+            put pGUI["links"][tNow["inside"]]["weight"] into field "tooltipField" stack "HowstrBeta" 
+         end if -- inside a node
+         -- set to 200x200; if formattedheight is <200, shrink height
+         set the rect of field "tooltipField" stack "howstrBeta" to 0,0,200,200
+         put the formattedHeight of char 1 to -1 of field "tooltipField" stack "HowstrBeta" into tHeight
+         if tHeight <200 then       
+            set the height of field "tooltipField" stack "HowstrBeta" to tHeight
+         end if
+         put the formattedWidth of char 1 to -1 of field "tooltipField" stack "HowstrBeta" into tWidth
+         if tWidth < 200 then
+            set the width of field "tooltipField" stack "HowstrBeta" to tWidth+10
+         end if
+         put the rect of field "tooltipField" stack "HowstrBeta" into tNow["tooltipRect"]
+      end if -- pHist tooltipRect not empty
+      
+      -- position the tooltip field
+      set the bottomright of field "tooltipField" stack "HowstrBeta" to tNow["moving"]
+      put the rect of field "tooltipField" stack "HowstrBeta" into tNow["tooltipRect"]
+      put item 1 of tNow["tooltipRect"] into tL
+      put item 2 of tNow["tooltipRect"] into tT
+      put item 3 of tNow["tooltipRect"] into tR
+      put item 4 of tNow["tooltipRect"] into tB
+      put item 1 of tNow["moving"] into tX
+      put item 2 of tNow["moving"] into tY
+      put the width of stack "HowstrBeta" into tW
+      put the height of stack "HowstrBeta" into tH
+      -- horizontal
+      if tL < 0 then
+         -- adjust to right side of mouse
+         put tR-tL into tSize
+         put tX+10 into tL
+         put tX+tSize+10 into tR
+      else if tR > tW then
+         put tR-tL into tSize
+         put tX-5 into tR
+         put tX-5-tSize into tL
+         -- adjust to left side of mouse
+      end if
+      -- vertical
+      if tT < 50 then
+         -- adjust below mouse
+         put tB-tT into tSize
+         put tY+10 into tT
+         put tY+tSize+10 into tB
+      else if tB > tH then
+         -- adjust above mouse
+         put tB-tT into tSize
+         put tY+5 into tB
+         put tY-tSize-5 into tT
+      end if
+      put tL,tT,tR,tB into tNow["tooltipRect"]
+      set the rect of field "tooltipField" stack "HowstrBeta" to tNow["tooltipRect"]
+      --      set the topleft of field "tooltipField" stack "HowstrBeta" to tNow["moving"]
+      set the layer of field "tooltipField" stack "HowstrBeta" to top
+      set the visible of field "tooltipField" stack "HowstrBeta" to true
+      unlock screen
+   else
+      set the visible of field "tooltipField" stack "HowstrBeta" to false
+      put empty into tNow["tooltipRect"]
+   end if -- tooltip checked, and inside a graph element, and butt 1/3 not down
+   -------------------------------- end tooltip -----------------------------------
+   
+   -- (1c) if there's an anchor node, track new areas entered
+   if p1Down is empty then
+      -- either not inside a node, or mouse not down, or both
+      put empty into p1Enter
+   else if (pHist["inside"] is not empty) and (tNow["inside"] is empty) then
+      -- just entered background
+      put "background" into p1Enter
+   else if pHist["inside"] is not tNow["inside"] then
+      -- just entered a graph element
+      put tNow["inside"] into p1Enter
+   end if
+   
+   -- (2) build preview request
+   -- defaults to "nothing"
+   put "nothing" into tPreview
+   if p1Down is among the keys of pGUI["nodes"] then -- butt down in a node
+      -- anchor and target
+      if p1Enter is among the keys of pGUI["nodes"] and p1Enter is not p1Down then -- entered another node
+         put p1Down & "," & p1Enter into tPreview -- preview appropriate links/nodes between anchor & target
+      else if p1Enter is p1Down then -- reentered node where butt down
+         --         put p1Down & "," & "info" into tPreview -- ! swap 1
+         put p1Down into tPreview -- preview focus on this node
+      end if
+      -- link can't be target
+      if p1Enter is among the keys of pGUI["links"] then put "nothing" into tPreview -- don't do anything if entered a link
+      
+      if p1Enter is empty then -- never left the node where butt down
+         if p1Down is among the keys of pGUI["nodes"] then -- butt down in node (already checked for this in first if ?!)
+            --            if p1Down is pFocus then
+            --               put "nothing" into tPreview
+            --            else
+            --               --               put p1Down into tPreview -- ! swap 2
+            --               put p1Down & "," & "info" into tPreview
+            --            end if
+            put p1Down & "," & "info" into tPreview -- show info preview
+         else
+            put "nothing" into tPreview -- down in something not a node, no info preview
+         end if
+      end if
+      if p1Enter is "background" and p1Down is among the keys of pGUI["nodes"] then
+         put "nothing" into tPreview
+         if item 1 of the mouseLoc < item 1 of the rect of pGUI["nodes"][p1Down]["graphic"] then put p1Down & ",left" into tPreview
+         if item 1 of the mouseLoc > item 3 of the rect of pGUI["nodes"][p1Down]["graphic"] then put p1Down & ",right" into tPreview
+      end if
+   end if
+   
+   -- ! for development
+   repeat for each key tKey in tNow
+      put tKey & ":" && tNow[tKey] & cr after tBlerg
+   end repeat
+   put "p1Down:" && p1Down & cr after tBlerg
+   put "p1Enter:" && p1Enter & cr after tBlerg
+   put "preview:" && tPreview after tBlerg
+   put tBlerg into field "viewMouse" stack "HowstrBeta" 
+   
+   put false into tCommit
+   -- button 1 just transitioned from down to up while there's an anchor
+   if p1Down is not empty and pHist["1down"] is true and tNow["1down"] is false then 
+      -- if mouse(1) never returns "down" then all the above is skipped and s1Down&s1Enter stay empty
+      -- the first time mouse(1) is down, 'inside' is put into s1Down (# if in a graph part, empty otherwise)
+      -- as long as s1Down stays empty nothing happens, and s1Enter is emptied out just in case
+      -- when mouse(1) first shows down, and a # is in 'inside', then s1Down gets it
+      -- s1Enter starts checking if 'inside' changes, but stays empty
+      -- when 'inside' changes, while s1Down is not empty, then the new # goes in s1Enter
+      -- if the mouse never left the anchor place, then s1Enter stayed empty
+      -- if the mouse returned to the anchor place, then s1Enter has its #   
+      -- therefore
+      -- if s1Enter is empty, the user clicked, so change focus
+      -- if s1Enter is background or #, the mouse is previewing
+      -- background: above/below node = nothing
+      -- background: right = new out-link-node
+      -- background: left = new node-link-in
+      -- #: link = nothing
+      -- #: node = new series of nodes & links
+      -- info: = open node info
+      put true into tCommit
+      put tPreview & cr before field "viewCommitments" stack "HowstrBeta"   -- ! for development
+      put empty into p1Down
+      put empty into p1Enter
+   end if
+   put tNow into pHist
+   -- preview is a message to the frontend to preview a change, if appropriate
+   -- previewAndChange() will return whatever the outcome of that logic is
+   -- goes in: nothing OR # OR #,# OR #,left OR #,right OR #,info
+   -- comes out: nothing OR a properly formatted change request array
+   put previewAndChange(tPreview,pGUI,pNode) into tRequest
+   if tRequest is not "nothing" and tCommit is true then 
+      return tRequest
+   else
+      return "nothing"
+   end if
+end mouseTracker
+
+function previewAndChange pToDo,pGUI,pNode -- returns "nothing" or array with change request
+   put "function previewAndChange" into xX["write"];    devLog xX
+   -- pToDo = nothing OR # OR #,# OR #,left OR #,right OR #,info
+   -- pGUI = array of info necessary for display, preview and change
+   -- pNode = display size of nodes in pixels   
+   
+   if pToDo is "nothing" then
+      set the visible of graphic "preFlow1" stack "HowstrBeta" to false
+      set the visible of field "preState" stack "HowstrBeta" to false
+      set the visible of field "preChange" stack "HowstrBeta" to false
+      set the visible of graphic "preFlow2" stack "HowstrBeta" to false
+      set the visible of graphic "preFocus" stack "HowstrBeta" to false
+      set the visible of widget "preInfo" stack "HowstrBeta" to false
+      return "nothing"
+   end if
+   -- expand node to view/edit info
+   if item 2 of pToDo is "info" then
+      put pGUI["nodes"][item 1 of pToDo]["horz"] & "," & pGUI["nodes"][item 1 of pToDo]["vert"] into tSpot
+      set the location of widget "preInfo" stack "HowstrBeta" to tSpot
+      set the visible of widget "preInfo" stack "HowstrBeta" to true
+      put item 1 of pToDo into tWhatever["info"]
+      
+      set the visible of graphic "preFlow1" stack "HowstrBeta" to false
+      set the visible of field "preState" stack "HowstrBeta" to false
+      set the visible of field "preChange" stack "HowstrBeta" to false
+      set the visible of graphic "preFlow2" stack "HowstrBeta" to false
+      set the visible of graphic "preFocus" stack "HowstrBeta" to false
+      return tWhatever
+   else
+      set the visible of widget "preInfo" stack "HowstrBeta" to false
+   end if
+   -- shift focus to another node
+   if the number of items of pToDo is 1 and pToDo is a number then
+      put pGUI["nodes"][pToDo]["horz"] & "," & pGUI["nodes"][pToDo]["vert"] into tSpot
+      set the location of graphic "preFocus" stack "HowstrBeta" to tSpot
+      set the visible of graphic "preFocus" stack "HowstrBeta" to true
+      put pToDo into tWhatever["focus"]
+      -- make sure these don't show at the same time
+      set the visible of graphic "preFlow1" stack "HowstrBeta" to false
+      set the visible of field "preState" stack "HowstrBeta" to false
+      set the visible of field "preChange" stack "HowstrBeta" to false
+      set the visible of graphic "preFlow2" stack "HowstrBeta" to false
+      return tWhatever
+   else
+      set the visible of graphic "preFocus" stack "HowstrBeta" to false
+   end if
+   ----------------------------------- research all conditions -------------------------
+   -- tUno=# (always anchor)
+   -- tDos=# left right (always target)
+   -- tStartAtDos=true false
+   -- adjacent=false or # (of link)
+   -- unoType=state change
+   -- dosType=state change
+   -- sameType=true false
+   put item 1 of pToDo into tUno
+   put item 2 of pToDo into tDos
+   -- link from uno-to-dos or dos-to-uno
+   put false into tStartAtDos
+   if tDos is "left" then
+      put true into tStartAtDos
+   else if tDos is a number then
+      -- use existing drawing to figure out flow direction
+      put the rect of pGUI["nodes"][tUno]["graphic"] into tUnoRect
+      put the rect of pGUI["nodes"][tDos]["graphic"] into tDosRect
+      if not (item 1 of tUnoRect < item 3 of tDosRect) then put true into tStartAtDos
+   end if
+   -- node types
+   put pGUI["nodes"][tUno]["type"] into tUnoType
+   put pGUI["nodes"][tDos]["type"] into tDosType
+   if tUnoType is tDosType then
+      put true into tSameType
+   else
+      put false into tSameType
+   end if
+   -- adjacency
+   -- link,node
+   put false into tAdjacent
+   put false into tDownish
+   put false into tUpish
+   repeat for each line tLine in pGUI["nodes"][tUno]["abutFlow"]
+      if tDos is item 2 of tLine then put item 1 of tLine into tAdjacent
+   end repeat
+   repeat for each line tLine in pGUI["nodes"][tUno]["abutDive"]
+      if pGUI["case"] is item 2 of tLine then put item 1 of tLine into tDownish
+   end repeat
+   repeat for each line tLine in pGUI["nodes"][tUno]["abutRise"]
+      if pGUI["case"] is item 2 of tLine then put item 1 of tLine into tUpish
+   end repeat
+   ------------------------------ end condition research -------------------------------
+   ------------------------------ geometry help -----------------------------------
+   put pNode / 2 into tHalfNode
+   put the mouseLoc into tMoving
+   put (item 2 of tMoving - pNode) into item 2 of tMoving
+   if tDos is a number then
+      -- two fixed nodes
+      if tStartAtDos is false then
+         put (pGUI["nodes"][tUno]["horz"] + tHalfNode) into tStartH
+         put pGUI["nodes"][tUno]["vert"] into tStartV
+         put (pGUI["nodes"][tDos]["horz"] - tHalfNode) into tEndH
+         put pGUI["nodes"][tDos]["vert"] into tEndV
+      else
+         put (pGUI["nodes"][tDos]["horz"] + tHalfNode) into tStartH
+         put pGUI["nodes"][tDos]["vert"] into tStartV
+         put (pGUI["nodes"][tUno]["horz"] - tHalfNode) into tEndH
+         put pGUI["nodes"][tUno]["vert"] into tEndV
+      end if
+   else if tStartAtDos is false then
+      -- uno fixed, dos is "left" or "right", tStartAtDos has to be false if "right"
+      put (pGUI["nodes"][tUno]["horz"] + tHalfNode) into tStartH
+      put pGUI["nodes"][tUno]["vert"] into tStartV
+      put (item 1 of tMoving - tHalfNode) into tEndH
+      put item 2 of tMoving into tEndV
+   else
+      put (item 1 of tMoving + tHalfNode) into tStartH
+      put item 2 of tMoving into tStartV
+      put (pGUI["nodes"][tUno]["horz"] - tHalfNode) into tEndH
+      put pGUI["nodes"][tUno]["vert"] into tEndV
+   end if
+   put tStartH & "," & tStartV into tStartCoord
+   put tEndH & "," & tEndV into tEndCoord
+   put tStartCoord & cr & tEndCoord into tLineCoord
+   put lineMidpoint(tLineCoord) into tMidCoord -- mathamagics.livecode
+   -- offset midpoint, normal to line, above midpoint vertical
+   -- line will always be left-to-right, so offset just goes +H relative to midpoint
+   put 0 & "," & pNode into tOffCoord
+   put rotateCoord(tOffCoord,tLineCoord) into tOffCoord -- mathamagics.livecode
+   put (item 1 of tMidCoord + item 1 of tOffCoord) into item 1 of tOffCoord
+   put (item 2 of tMidCoord + item 2 of tOffCoord) into item 2 of tOffCoord
+   -- room around offset midpoint for a preview node
+   put (item 1 of tOffCoord - tHalfNode) & "," & (item 2 of tOffCoord) into tMidLeft
+   put (item 1 of tOffCoord + tHalfNode) & "," & (item 2 of tOffCoord) into tMidRight
+   -- location(s) of other node when previewing two
+   -- ? not sure if I actually used these two
+   put (item 1 of tOffCoord + pNode) & "," & (item 2 of tOffCoord) into tOffCoordRight
+   put (item 1 of tOffCoord - pNode) & "," & (item 2 of tOffCoord) into tOffCoordLeft
+   -- location when preview following the mouse
+   put (item 1 of the mouseLoc) & "," & (item 2 of the mouseLoc - pNode) into tPlace
+   put (item 1 of tPlace + tHalfNode) & "," & (item 2 of tPlace) into tStart
+   put (pGUI["nodes"][tNode]["horz"] - tHalfNode) & "," & pGUI["nodes"][tNode]["vert"] into tEnd
+   put tStart & cr & tEnd into tLine
+   ------------------------------ end geometry help ------------------------------
+   -- show a single flow between the nodes
+   if tUno is a number and tDos is a number and tSameType is false and tAdjacent is false then
+      set the points of graphic "preFlow1" stack "HowstrBeta" to tLineCoord
+      set the visible of graphic "preFlow1" stack "HowstrBeta" to true
+      set the visible of graphic "preFlow2" stack "HowstrBeta" to false
+      set the visible of field "preState" stack "HowstrBeta" to false
+      set the visible of field "preChange" stack "HowstrBeta" to false
+      -- format graph change request
+      -- ! don't have a return address for area yet, but will need that
+      put"flow_btwn_diffType" into tTemp[0]["act"]
+      put "flow" into tTemp["a"]["type"]
+      if tStartAtDos is false then
+         put tUno into tTemp["a"]["backward"]
+         put tDos into tTemp["a"]["forward"]
+      else
+         put tDos into tTemp["a"]["backward"]
+         put tUno into tTemp["a"]["forward"]
+      end if 
+      return tTemp
+   end if
+   -- show a single node, and two flows, between the nodes
+   if tUno is a number and tDos is a number and tSameType is true then
+      set the points of graphic "preFlow1" stack "HowstrBeta" to (tStartCoord & cr & tMidLeft)
+      set the points of graphic "preFlow2" stack "HowstrBeta" to (tMidRight & cr & tEndCoord)
+      set the visible of graphic "preFlow1" stack "HowstrBeta" to true
+      set the visible of graphic "preFlow2" stack "HowstrBeta" to true
+      if tUnoType is "state" then
+         set the location of field "preChange" stack "HowstrBeta" to tOffCoord
+         set the visible of field "preChange" stack "HowstrBeta" to true
+         set the visible of field "preState" stack "HowstrBeta" to false
+      else
+         set the location of field "preState" stack "HowstrBeta" to tOffCoord
+         set the visible of field "preChange" stack "HowstrBeta" to false
+         set the visible of field "preState" stack "HowstrBeta" to true
+      end if
+      -- format graph change request
+      -- ! don't have a return address for area yet, but will need that
+      /*
+      x[a][type]=state/change
+      x[b][type]=flow
+      x[b][backward]=#/ltr
+      x[b][forward]=#/ltr
+      x[c][type]=flow
+      x[c][backward]=#/ltr
+      x[c][forward]=#/ltr
+      */
+      put "span_detached_sameType" into tTemp[0]["act"]
+      if tUnoType is "state" then
+         put "change" into tTemp["a"]["type"]
+      else
+         put "state" into tTemp["a"]["type"]
+      end if
+      --      put "user" into tTemp["b"]["from"]
+      put "flow" into tTemp["b"]["type"]
+      put "flow" into tTemp["c"]["type"]
+      if tStartAtDos is false then
+         put tUno into tTemp["b"]["backward"]
+         put "a" into tTemp["b"]["forward"]
+         put "a" into tTemp["c"]["backward"]
+         put tDos into tTemp["c"]["forward"]
+      else
+         put tDos into tTemp["b"]["backward"]
+         put "a" into tTemp["b"]["forward"]
+         put "a" into tTemp["c"]["backward"]
+         put tUno into tTemp["c"]["forward"]
+      end if 
+      return tTemp
+   end if
+   -- from one node to neighbor, so type is different
+   -- must show state and change, in correct order
+   -- must show flow, on correct side
+   if tUno is a number and tDos is a number and not (tAdjacent is false) then ------------------------------------------------
+      -- flow preview attached to uno (anchor)
+      set the visible of graphic "preFlow1" stack "HowstrBeta" to true
+      set the visible of graphic "preFlow2" stack "HowstrBeta" to false
+      -- format graph change request
+      -- state node [a], change node [b], three flows [c][d][e]
+      -- hide existing flow [#]
+      put "inject_btwn_diffType" into tTemp[0]["act"]
+      put "state" into tTemp["a"]["type"]
+      put "change" into tTemp["b"]["type"]
+      put "flow" into tTemp["c"]["type"]
+      put "flow" into tTemp["d"]["type"]
+      put "flow" into tTemp["e"]["type"]
+      put tAdjacent into tTemp["hide"]
+      if tStartAtDos is false and tUnoType is "state" then
+         set the points of graphic "preFlow1" stack "HowstrBeta" to (tStartCoord & cr & tMidLeft)
+         set the location of field "preChange" stack "HowstrBeta" to tOffCoord
+         set the location of field "preState" stack "HowstrBeta" to ((item 1 of tOffCoord + pNode) & "," & item 2 of tOffCoord)
+         set the visible of field "preChange" stack "HowstrBeta" to true
+         set the visible of field "preState" stack "HowstrBeta" to true
+         -- format graph change request
+         -- uno > flow c > change b > flow d > state a > flow e > dos
+         put tUno into tTemp["c"]["backward"]
+         put "b" into tTemp["c"]["forward"]
+         put "b" into tTemp["d"]["backward"]
+         put "a" into tTemp["d"]["forward"]
+         put "a" into tTemp["e"]["backward"]
+         put tDos into tTemp["e"]["forward"]
+      else if tStartAtDos is false and tUnoType is "change" then
+         set the points of graphic "preFlow1" stack "HowstrBeta" to (tStartCoord & cr & tMidLeft)
+         set the location of field "preState" stack "HowstrBeta" to tOffCoord
+         set the location of field "preChange" stack "HowstrBeta" to ((item 1 of tOffCoord + pNode) & "," & item 2 of tOffCoord)
+         set the visible of field "preChange" stack "HowstrBeta" to true
+         set the visible of field "preState" stack "HowstrBeta" to true
+         -- format graph change request
+         -- uno > flow c > state a > flow d > change b > flow e > dos
+         put tUno into tTemp["c"]["backward"]
+         put "a" into tTemp["c"]["forward"]
+         put "a" into tTemp["d"]["backward"]
+         put "b" into tTemp["d"]["forward"]
+         put "b" into tTemp["e"]["backward"]
+         put tDos into tTemp["e"]["forward"]
+      else if tStartAtDos is true and tDosType is "state" then
+         set the points of graphic "preFlow1" stack "HowstrBeta" to (tMidRight & cr & tEndCoord)
+         set the location of field "preState" stack "HowstrBeta" to tOffCoord
+         set the location of field "preChange" stack "HowstrBeta" to ((item 1 of tOffCoord - pNode) & "," & item 2 of tOffCoord)
+         set the visible of field "preChange" stack "HowstrBeta" to true
+         set the visible of field "preState" stack "HowstrBeta" to true
+         -- format graph change request
+         -- dos > flow e > change b > flow d > state a > flow c > uno
+         put tDos into tTemp["e"]["backward"]
+         put "b" into tTemp["e"]["forward"]
+         put "b" into tTemp["d"]["backward"]
+         put "a" into tTemp["d"]["forward"]
+         put "a" into tTemp["c"]["backward"]
+         put tUno into tTemp["c"]["forward"]       
+      else if tStartAtDos is true and tDosType is "change" then
+         set the points of graphic "preFlow1" stack "HowstrBeta" to (tMidRight & cr & tEndCoord)
+         set the location of field "preChange" stack "HowstrBeta" to tOffCoord
+         set the location of field "preState" stack "HowstrBeta" to ((item 1 of tOffCoord - pNode) & "," & item 2 of tOffCoord)
+         set the visible of field "preChange" stack "HowstrBeta" to true
+         set the visible of field "preState" stack "HowstrBeta" to true
+         -- format graph change request
+         -- dos > flow e > state a > flow d > change b > flow c > uno
+         put tDos into tTemp["e"]["backward"]
+         put "a" into tTemp["e"]["forward"]
+         put "a" into tTemp["d"]["backward"]
+         put "b" into tTemp["d"]["forward"]
+         put "b" into tTemp["c"]["backward"]
+         put tUno into tTemp["c"]["forward"]
+      end if
+      return tTemp
+   end if
+   -- show "left" or "right" node(s), as appropriate, and flow on correct side --------------------------------
+   if tDos is "left" or tDos is "right" then
+      -- need a flow [a] and a state [b]
+      -- need a dive/rise [c]
+      -- maybe a change [d] and another flow [e]
+      -- maybe hide existing dive/rise [#]
+      -- tUpish will have rise if "right"
+      -- tDownish will have dive if "left"
+      put "flow_branch" into tTemp[0]["act"]
+      put "flow" into tTemp["a"]["type"]
+      put "state" into tTemp["b"]["type"]
+      if tDos is "right" and tUnoType is "change" then -- can't be #,# if script got this far
+         set the points of graphic "preFlow1" stack "HowstrBeta" to tLineCoord
+         set the location of field "preState" stack "HowstrBeta" to tMoving
+         set the visible of field "preChange" stack "HowstrBeta" to false
+         set the visible of field "preState" stack "HowstrBeta" to true
+         set the visible of graphic "preFlow1" stack "HowstrBeta" to true
+         set the visible of graphic "preFlow2" stack "HowstrBeta" to false
+         -- format graph change request
+         -- uno > flow a > state b > rise c > case
+         put tUno into tTemp["a"]["backward"]
+         put "b" into tTemp["a"]["forward"]
+         put "rise" into tTemp["c"]["type"]
+         put "b" into tTemp["c"]["backward"]
+         put pGUI["case"] into tTemp["c"]["forward"]
+      else if tDos is "right" and tUnoType is "state" then
+         set the points of graphic "preFlow1" stack "HowstrBeta" to tLineCoord
+         set the location of field "preChange" stack "HowstrBeta" to tMoving
+         set the location of field "preState" stack "HowstrBeta" to ((item 1 of tMoving + pNode) & "," & item 2 of tMoving)
+         set the visible of field "preChange" stack "HowstrBeta" to true
+         set the visible of field "preState" stack "HowstrBeta" to true
+         set the visible of graphic "preFlow1" stack "HowstrBeta" to true
+         set the visible of graphic "preFlow2" stack "HowstrBeta" to false
+         -- format graph change request
+         -- uno > flow a > change d > flow e > state b > rise c > case
+         -- since this is a state, going right, it might already have a rise link
+         put tUno into tTemp["a"]["backward"]
+         put "d" into tTemp["a"]["forward"]
+         put "change" into tTemp["d"]["type"]
+         put "flow" into tTemp["e"]["type"]
+         put "d" into tTemp["e"]["backward"]
+         put "b" into tTemp["e"]["forward"]
+         put "rise" into tTemp["c"]["type"]
+         put "b" into tTemp["c"]["backward"]
+         put pGUI["case"] into tTemp["c"]["forward"]
+         if not (tUpish is false) then 
+            put tUpish into tTemp["hide"]
+         end if
+      else if tDos is "left" and tUnoType is "change" then
+         set the points of graphic "preFlow1" stack "HowstrBeta" to tLineCoord
+         set the location of field "preState" stack "HowstrBeta" to tMoving
+         set the visible of field "preChange" stack "HowstrBeta" to false
+         set the visible of field "preState" stack "HowstrBeta" to true
+         set the visible of graphic "preFlow1" stack "HowstrBeta" to true
+         set the visible of graphic "preFlow2" stack "HowstrBeta" to false
+         -- format graph change request
+         -- case > dive c > state b > flow a > uno
+         put "dive" into tTemp["c"]["type"]
+         put pGUI["case"] into tTemp["c"]["backward"]
+         put "b" into tTemp["c"]["forward"]
+         put "b" into tTemp["a"]["backward"]
+         put tUno into tTemp["a"]["forward"]
+      else if tDos is "left" and tUnoType is "state" then
+         set the points of graphic "preFlow1" stack "HowstrBeta" to tLineCoord
+         set the location of field "preChange" stack "HowstrBeta" to tMoving
+         set the location of field "preState" stack "HowstrBeta" to ((item 1 of tMoving - pNode) & "," & item 2 of tMoving)
+         set the visible of field "preChange" stack "HowstrBeta" to true
+         set the visible of field "preState" stack "HowstrBeta" to true
+         set the visible of graphic "preFlow1" stack "HowstrBeta" to true
+         set the visible of graphic "preFlow2" stack "HowstrBeta" to false
+         -- format graph change request
+         -- case > c > b > e > d > a > uno
+         -- since this is a state, going left, it might already have a dive link
+         if not (tDownish is false) then 
+            put tDownish into tTemp["hide"]
+         end if
+         put "dive" into tTemp["c"]["type"]
+         put pGUI["case"] into tTemp["c"]["backward"]
+         put "b" into tTemp["c"]["forward"]
+         put "flow" into tTemp["e"]["type"]
+         put "b" into tTemp["e"]["backward"]
+         put "d" into tTemp["e"]["forward"]
+         put "change" into tTemp["d"]["type"]
+         put "d" into tTemp["a"]["backward"]
+         put tUno into tTemp["a"]["forward"]
+      end if
+      return tTemp
+   end if
+end previewAndChange
+
+on graphManager pDo -- ! will be more complicated when not just a test
+   put "on graphManager" into xX["write"];    devLog xX
+   -- makes any changes, then calls draw functions, which call display functions
+   -- pDo empty OR #,# OR #,left OR #,right OR #
+   -- make changes if passed in parameter pDo
+   if pDo is empty then
+      -- whatevs
+   else if pDo is a number then
+      -- #
+      put pDo into sNowFocus
+   else if item 2 of pDo is a number then
+      -- #,#
+      -- check for existing link between these two nodes
+      -- if there is already a link, that will dictate which way to go
+      put item 1 of pDo into tAnchor
+      put item 2 of pDo into tTarget
+      put empty into tWas
+      repeat for each word tType in "next prev"
+         repeat for each item tPointer in sGraphData["nodes"][tAnchor][tType]
+            put item 1 of sGraphData["links"][tPointer][tType] into tTest
+            if tTest is tTarget then 
+               -- tAnchor has a pointer to a link with a pointer to tTarget
+               -- delete link
+               delete variable sGraphData["links"][tPointer]
+               -- delete pointer to link in tAnchor
+               delete item itemOffset(tPointer,sGraphData["nodes"][tAnchor][tType]) of sGraphData["nodes"][tAnchor][tType]
+               -- delete pointer to link in tTarget
+               if tType is "next" then delete item itemOffset(tPointer,sGraphData["nodes"][tTarget]["prev"]) of sGraphData["nodes"][tTarget]["prev"]
+               if tType is "prev" then delete item itemOffset(tPointer,sGraphData["nodes"][tTarget]["next"]) of sGraphData["nodes"][tTarget]["next"]
+               put tType into tWas
+            end if
+         end repeat
+      end repeat
+      -- link found and deleted means tWas has the direction for the new link(s) relative to tAnchor
+      -- link not found means that the correct direction has to be discovered
+      if tWas is empty then
+         -- assume anchor-to-target, unless their layer order prevents that 
+         -- ! layer order is a proxy for actually checking if the link creates a cycle
+         -- ! doing it this way will have undesirable edge cases
+         put sGraphDrawing["nodes"][tAnchor]["layer"] into tAnchorLay
+         put sGraphDrawing["nodes"][tTarget]["layer"] into tTargetLay
+         if tTargetLay < tAnchorLay then
+            put tTarget into tStart
+            put tAnchor into tEnd
+         else
+            put tTarget into tEnd
+            put tAnchor into tStart
+         end if
+      else -- tWas not empty
+         if tWas is "next" then
+            put tAnchor into tStart
+            put tTarget into tEnd
+         else
+            put tTarget into tStart
+            put tAnchor into tEnd
+         end if
+      end if
+      -- now we know that the link(s) should go from node tStart to node tEnd
+      -- and that there's no existing link in the way
+      -- need new link, new node, and new link
+      put sGraphData["lastRec"] into tRec      
+      put tStart & "," after sGraphData["links"][tRec+1]["prev"]
+      put tRec+2 & "," after sGraphData["links"][tRec+1]["next"]
+      
+      put tRec+1 & "," after sGraphData["nodes"][tRec+2]["prev"]
+      put tRec+3 & "," after sGraphData["nodes"][tRec+2]["next"]
+      
+      put tRec+2 & "," after sGraphData["links"][tRec+3]["prev"]
+      put tEnd & "," after sGraphData["links"][tRec+3]["next"]
+      
+      put tRec+3 & "," after sGraphData["nodes"][tEnd]["prev"]
+      put tRec+1 & "," after sGraphData["nodes"][tStart]["next"]      
+      put tRec+3 into sGraphData["lastRec"] 
+   else
+      -- #,left/right
+      put item 1 of pDo into tNode
+      put item 2 of pDo into tDir
+      if tDir is "left" then
+         put sGraphData["lastRec"] into tRec
+         put tRec+1 & "," after sGraphData["nodes"][tNode]["prev"]
+         put tNode & "," after sGraphData["links"][tRec+1]["next"]
+         put tRec+2 & "," after sGraphData["links"][tRec+1]["prev"]
+         put tRec+1 & "," after sGraphData["nodes"][tRec+2]["next"]
+         put tRec+2 into sGraphData["lastRec"]
+      else if tDir is "right" then
+         put sGraphData["lastRec"] into tRec
+         put tRec+1 & "," after sGraphData["nodes"][tNode]["next"]
+         put tNode & "," after sGraphData["links"][tRec+1]["prev"]
+         put tRec+2 & "," after sGraphData["links"][tRec+1]["next"]
+         put tRec+1 & "," after sGraphData["nodes"][tRec+2]["prev"]
+         put tRec+2 into sGraphData["lastRec"]
+      end if
+   end if
+   middleOut sGraphData
+end graphManager
+
